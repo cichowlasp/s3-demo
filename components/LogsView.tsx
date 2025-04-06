@@ -21,64 +21,33 @@ export default function LogsView() {
 	const [searchTerm, setSearchTerm] = useState('');
 
 	useEffect(() => {
-		// Simulate fetching logs from AWS Lambda
+		// Fetch logs from SNS topic via API
 		const fetchLogs = async () => {
 			setLoading(true);
 			setError(null);
 
 			try {
-				// This would be replaced with actual AWS Lambda logs API call
-				await new Promise((resolve) => setTimeout(resolve, 1500));
+				console.log('Fetching logs from API...');
+				const response = await fetch('/api/logs');
 
-				// Mock data
-				const mockLogs: LogEntry[] = [
-					{
-						id: '1',
-						timestamp: '2023-10-15T14:48:00Z',
-						level: 'INFO',
-						message: 'File upload initiated',
-						lambdaFunction: 'fileUploadHandler',
-						requestId: 'req-123456',
-					},
-					{
-						id: '2',
-						timestamp: '2023-10-15T14:49:30Z',
-						level: 'INFO',
-						message: 'File upload completed successfully',
-						lambdaFunction: 'fileUploadHandler',
-						requestId: 'req-123456',
-					},
-					{
-						id: '3',
-						timestamp: '2023-10-15T15:10:00Z',
-						level: 'WARN',
-						message: 'File size exceeds recommended limit',
-						lambdaFunction: 'fileValidationHandler',
-						requestId: 'req-789012',
-					},
-					{
-						id: '4',
-						timestamp: '2023-10-15T15:30:45Z',
-						level: 'ERROR',
-						message: 'Failed to delete file: permission denied',
-						lambdaFunction: 'fileDeleteHandler',
-						requestId: 'req-345678',
-					},
-					{
-						id: '5',
-						timestamp: '2023-10-15T16:05:12Z',
-						level: 'INFO',
-						message: 'User authenticated successfully',
-						lambdaFunction: 'authHandler',
-						requestId: 'req-901234',
-					},
-				];
+				if (!response.ok) {
+					throw new Error(`HTTP error! Status: ${response.status}`);
+				}
 
-				setLogs(mockLogs);
+				const data = await response.json();
+				console.log('Received logs data:', data);
+
+				if (!data.success) {
+					throw new Error(data.message || 'Failed to fetch logs');
+				}
+
+				setLogs(data.logs || []);
 			} catch (error) {
 				console.error('Error fetching logs:', error);
 				setError(
-					'Failed to fetch Lambda logs. Please try again later.'
+					error instanceof Error
+						? `Failed to fetch SNS logs: ${error.message}`
+						: 'Failed to fetch SNS logs. Please try again later.'
 				);
 			} finally {
 				setLoading(false);
@@ -86,6 +55,12 @@ export default function LogsView() {
 		};
 
 		fetchLogs();
+
+		// Set up polling to refresh logs every 30 seconds
+		const intervalId = setInterval(fetchLogs, 30000);
+
+		// Clean up interval on component unmount
+		return () => clearInterval(intervalId);
 	}, []);
 
 	const filteredLogs = logs.filter((log) => {
